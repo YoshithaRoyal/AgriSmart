@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Agriculture Crop Recommendation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2pdf for exporting reports -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* PDF Export Light Theme Fixes (Inline to avoid browser caching issues) */
+        .light-pdf-mode .card {
+            background: #FFFFFF !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: none !important;
+            border: none !important;
+            color: #000000 !important;
+        }
+
+        .light-pdf-mode h2,
+        .light-pdf-mode h3,
+        .light-pdf-mode .result-item .label,
+        .light-pdf-mode .tips-section li,
+        .light-pdf-mode .tips-section strong {
+            color: #1E293B !important;
+        }
+
+        .light-pdf-mode .result-content {
+            background: #F1F5F9 !important;
+            border: 1px solid #E2E8F0 !important;
+        }
+
+        .light-pdf-mode .tips-section li {
+            background: #F8FAFC !important;
+            border-left: 3px solid #3498DB !important;
+            color: #334155 !important;
+        }
+
+        .light-pdf-mode * {
+            text-shadow: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>AgriSmart</h1>
+            <p>AI-Powered Crop & Profit Recommendation</p>
+        </header>
+
+        <main>
+            <div class="card form-card">
+                <h2>Enter Soil & Weather Data</h2>
+
+                <!-- Weather API Integration -->
+                <div class="weather-section">
+                    <label>Autofill Weather Data</label>
+                    <div class="weather-input-group">
+                        <input type="text" id="city-input" placeholder="Enter your city (e.g. Mumbai)">
+                        <button type="button" id="fetch-weather-btn" class="secondary-btn">
+                            <span class="btn-text">Get Weather</span>
+                            <div class="loader" id="weather-loader" style="display: none;"></div>
+                        </button>
+                    </div>
+                    <small id="weather-msg"></small>
+                </div>
+
+                <form id="prediction-form">
+                    <div class="input-grid">
+                        <div class="input-group">
+                            <label for="N">Nitrogen (N): <span class="range-val" id="N-val">90</span></label>
+                            <input type="range" id="N" name="N" min="0" max="150" value="90" step="1"
+                                oninput="document.getElementById('N-val').textContent = this.value">
+                        </div>
+                        <div class="input-group">
+                            <label for="P">Phosphorus (P): <span class="range-val" id="P-val">42</span></label>
+                            <input type="range" id="P" name="P" min="0" max="150" value="42" step="1"
+                                oninput="document.getElementById('P-val').textContent = this.value">
+                        </div>
+                        <div class="input-group">
+                            <label for="K">Potassium (K): <span class="range-val" id="K-val">43</span></label>
+                            <input type="range" id="K" name="K" min="0" max="210" value="43" step="1"
+                                oninput="document.getElementById('K-val').textContent = this.value">
+                        </div>
+                        <div class="input-group">
+                            <label for="temperature">Temperature (°C): <span class="range-val"
+                                    id="temperature-val">20.8</span></label>
+                            <input type="range" id="temperature" name="temperature" min="0" max="50" value="20.8"
+                                step="0.1"
+                                oninput="document.getElementById('temperature-val').textContent = this.value">
+                        </div>
+                        <div class="input-group">
+                            <label for="humidity">Humidity (%): <span class="range-val"
+                                    id="humidity-val">82</span></label>
+                            <input type="range" id="humidity" name="humidity" min="0" max="100" value="82" step="1"
+                                oninput="document.getElementById('humidity-val').textContent = this.value">
+                        </div>
+                        <div class="input-group">
+                            <label for="ph">Soil pH: <span class="range-val" id="ph-val">6.5</span></label>
+                            <input type="range" id="ph" name="ph" min="1" max="14" value="6.5" step="0.1"
+                                oninput="document.getElementById('ph-val').textContent = this.value">
+                        </div>
+                        <div class="input-group full-width">
+                            <label for="rainfall">Rainfall (mm): <span class="range-val"
+                                    id="rainfall-val">202.9</span></label>
+                            <input type="range" id="rainfall" name="rainfall" min="0" max="300" value="202.9" step="0.1"
+                                oninput="document.getElementById('rainfall-val').textContent = this.value">
+                        </div>
+                    </div>
+                    <button type="submit" id="submit-btn">
+                        <span class="btn-text">Predict Crop</span>
+                        <div class="loader" id="btn-loader" style="display: none;"></div>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Report Card (used for PDF generation) -->
+            <div id="report-container">
+                <div class="card result-card" id="result-card" style="display: none;">
+                    <h2>Recommendation Report</h2>
+                    <div class="result-content">
+                        <div class="result-item">
+                            <span class="label">Recommended Crop</span>
+                            <span class="value highlight" id="crop-result">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Estimated Profit</span>
+                            <span class="value success" id="profit-result">-</span>
+                        </div>
+                    </div>
+
+                    <div class="insights-grid">
+                        <div class="tips-section">
+                            <h3>Growing Insights</h3>
+                            <ul>
+                                <li><strong>Season:</strong> <span id="tip-season">-</span></li>
+                                <li><strong>Harvest:</strong> <span id="tip-harvest">-</span></li>
+                                <li><strong>Expert Tip:</strong> <span id="tip-text">-</span></li>
+                            </ul>
+                        </div>
+
+                        <div class="chart-section">
+                            <h3>Soil Comparison</h3>
+                            <canvas id="soilChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="reset-btn" id="reset-btn">Analyze New Data</button>
+                        <button class="export-btn" id="export-btn">Download PDF Report</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let myChart = null;
+
+        // Fetch Weather Logic
+        document.getElementById('fetch-weather-btn').addEventListener('click', async () => {
+            const city = document.getElementById('city-input').value;
+            const msg = document.getElementById('weather-msg');
+            const btnText = document.querySelector('#fetch-weather-btn .btn-text');
+            const loader = document.getElementById('weather-loader');
+
+            if (!city) {
+                msg.textContent = 'Please enter a city name.';
+                msg.className = 'error-text';
+                return;
+            }
+
+            btnText.style.display = 'none';
+            loader.style.display = 'block';
+            msg.textContent = '';
+
+            try {
+                const response = await fetch('/weather', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('temperature').value = data.temperature;
+                    document.getElementById('temperature-val').textContent = data.temperature;
+                    document.getElementById('humidity').value = data.humidity;
+                    document.getElementById('humidity-val').textContent = data.humidity;
+                    document.getElementById('rainfall').value = data.rainfall;
+                    document.getElementById('rainfall-val').textContent = data.rainfall;
+                    msg.textContent = 'Weather autofilled successfully!';
+                    msg.className = 'success-text';
+                } else {
+                    msg.textContent = data.error || 'Failed to fetch weather.';
+                    msg.className = 'error-text';
+                }
+            } catch (err) {
+                msg.textContent = 'Error connecting to weather service.';
+                msg.className = 'error-text';
+            } finally {
+                btnText.style.display = 'block';
+                loader.style.display = 'none';
+            }
+        });
+
+        // Prediction Logic
+        document.getElementById('prediction-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const btnText = document.querySelector('#submit-btn .btn-text');
+            const loader = document.getElementById('btn-loader');
+            const submitBtn = document.getElementById('submit-btn');
+
+            btnText.style.display = 'none';
+            loader.style.display = 'block';
+            submitBtn.disabled = true;
+
+            const N = parseFloat(document.getElementById('N').value);
+            const P = parseFloat(document.getElementById('P').value);
+            const K = parseFloat(document.getElementById('K').value);
+            const ph = parseFloat(document.getElementById('ph').value);
+
+            const formData = {
+                N: document.getElementById('N').value,
+                P: document.getElementById('P').value,
+                K: document.getElementById('K').value,
+                temperature: document.getElementById('temperature').value,
+                humidity: document.getElementById('humidity').value,
+                ph: document.getElementById('ph').value,
+                rainfall: document.getElementById('rainfall').value
+            };
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Update Results
+                    document.getElementById('crop-result').textContent = data.crop;
+                    document.getElementById('profit-result').textContent = data.profit;
+
+                    // Update Tips
+                    document.getElementById('tip-season').textContent = data.tips.season;
+                    document.getElementById('tip-harvest').textContent = data.tips.harvest;
+                    document.getElementById('tip-text').textContent = data.tips.tip;
+
+                    // Update Chart
+                    updateChart(
+                        [N, P, K, ph],
+                        [data.ideal_metrics.N, data.ideal_metrics.P, data.ideal_metrics.K, data.ideal_metrics.ph]
+                    );
+
+                    // Show Result Card
+                    document.querySelector('.form-card').style.display = 'none';
+                    const resultCard = document.getElementById('result-card');
+                    resultCard.style.display = 'block';
+
+                    resultCard.classList.remove('fade-in');
+                    void resultCard.offsetWidth; // trigger reflow
+                    resultCard.classList.add('fade-in');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('An error occurred while predicting. Please try again.');
+                console.error(error);
+            } finally {
+                btnText.style.display = 'block';
+                loader.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Chart.js Logic
+        function updateChart(userData, idealData) {
+            const ctx = document.getElementById('soilChart').getContext('2d');
+
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Nitrogen', 'Phosphorus', 'Potassium', 'pH'],
+                    datasets: [
+                        {
+                            label: 'Your Soil',
+                            data: userData,
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Ideal Averages',
+                            data: idealData,
+                            backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                            borderColor: 'rgba(46, 204, 113, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#94A3B8' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#94A3B8' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#F8FAFC' } }
+                    }
+                }
+            });
+        }
+
+        // PDF Export Logic
+        document.getElementById('export-btn').addEventListener('click', () => {
+            const element = document.getElementById('report-container');
+            const card = document.getElementById('result-card');
+
+            // Hide the buttons before generating PDF
+            document.querySelector('.action-buttons').style.display = 'none';
+            // Force light theme for PDF so it renders clearly and is printer-friendly
+            element.classList.add('light-pdf-mode');
+
+            // We need to re-render the chart with dark text/grid lines for the PDF
+            const N = parseFloat(document.getElementById('N').value);
+            const P = parseFloat(document.getElementById('P').value);
+            const K = parseFloat(document.getElementById('K').value);
+            const ph = parseFloat(document.getElementById('ph').value);
+
+            // If myChart exists, update its colors to dark mode
+            if (myChart) {
+                myChart.options.scales.x.ticks.color = '#1e293b';
+                myChart.options.scales.y.ticks.color = '#1e293b';
+                myChart.options.plugins.legend.labels.color = '#1e293b';
+                myChart.update();
+            }
+
+            const opt = {
+                margin: 0.5,
+                filename: 'agrismart_report.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, logging: true },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Wait 500ms to allow the browser to repaint the light theme CSS and Chart updates before taking the snapshot
+            setTimeout(() => {
+                html2pdf().set(opt).from(element).save().then(() => {
+                    // Restore buttons and remove light theme
+                    document.querySelector('.action-buttons').style.display = 'flex';
+                    element.classList.remove('light-pdf-mode');
+
+                    // Restore chart colors back to dark theme
+                    if (myChart) {
+                        myChart.options.scales.x.ticks.color = '#94A3B8';
+                        myChart.options.scales.y.ticks.color = '#94A3B8';
+                        myChart.options.plugins.legend.labels.color = '#F8FAFC';
+                        myChart.update();
+                    }
+                });
+            }, 500);
+        });
+
+        // Reset Logic
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            document.getElementById('prediction-form').reset();
+
+            // Reset span values to match default slider values
+            document.getElementById('N-val').textContent = document.getElementById('N').value;
+            document.getElementById('P-val').textContent = document.getElementById('P').value;
+            document.getElementById('K-val').textContent = document.getElementById('K').value;
+            document.getElementById('temperature-val').textContent = document.getElementById('temperature').value;
+            document.getElementById('humidity-val').textContent = document.getElementById('humidity').value;
+            document.getElementById('ph-val').textContent = document.getElementById('ph').value;
+            document.getElementById('rainfall-val').textContent = document.getElementById('rainfall').value;
+
+            document.getElementById('city-input').value = '';
+            document.getElementById('weather-msg').textContent = '';
+
+            document.getElementById('result-card').style.display = 'none';
+
+            const formCard = document.querySelector('.form-card');
+            formCard.style.display = 'block';
+            formCard.classList.remove('fade-in');
+            void formCard.offsetWidth; // trigger reflow
+            formCard.classList.add('fade-in');
+        });
+    </script>
+</body>
+
+</html>

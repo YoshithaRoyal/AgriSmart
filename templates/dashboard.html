@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AgriSmart</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-brand"><a href="{{ url_for('home') }}" style="color: white; text-decoration: none;">AgriSmart</a></div>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Predict</a>
+            <a href="{{ url_for('logout') }}">Logout ({{ current_user.username }})</a>
+            <select id="theme-selector">
+                <option value="dark">Midnight</option>
+                <option value="ocean">Ocean Blue</option>
+            </select>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 1000px; padding-top: 5rem;">
+        <header>
+            <h1 style="font-size: 2.5rem;">Your Farm History</h1>
+            <p>Past soil analyses and crop recommendations</p>
+        </header>
+
+        <main>
+            <div class="card form-card">
+                {% if histories %}
+                <div style="overflow-x: auto;">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Soil (N,P,K,pH)</th>
+                                <th>Weather (Temp,Hum,Rain)</th>
+                                <th>Crop</th>
+                                <th>Fertilizer</th>
+                                <th>Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for history in histories %}
+                            <tr>
+                                <td>{{ history.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ history.n }}, {{ history.p }}, {{ history.k }}, {{ history.ph }}</td>
+                                <td>{{ history.temp }}°C, {{ history.humidity }}%, {{ history.rainfall }}mm</td>
+                                <td style="color: var(--primary-color); font-weight: 600;">{{ history.crop }}</td>
+                                <td style="color: #F1C40F;">{{ history.fertilizer }}</td>
+                                <td style="color: var(--secondary-color);">{{ history.profit }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="text-align: center; padding: 2rem;">
+                    <h3 style="color: var(--text-muted);">No history found!</h3>
+                    <p style="margin-top: 1rem;"><a href="{{ url_for('home') }}" style="color: var(--primary-color);">Make your first prediction here.</a></p>
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>
